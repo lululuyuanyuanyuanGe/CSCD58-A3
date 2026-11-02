@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 """
 Start up a Simple topology for CS144
@@ -13,6 +13,7 @@ from mininet.util import quietRun
 from mininet.moduledeps import pathCheck
 
 from sys import exit
+from functools import partial
 import os.path
 from subprocess import Popen, STDOUT, PIPE
 
@@ -28,7 +29,7 @@ class CS144Topo( Topo ):
         Topo.__init__( self, *args, **kwargs )
         server1 = self.addHost( 'server1' )
         server2 = self.addHost( 'server2' )
-        router = self.addSwitch( 'sw0' )
+        router = self.addSwitch( 'sw0', protocols=["OpenFlow10"] )
         client = self.addHost('client')
         for h in server1, server2, client:
             self.addLink( h, router )
@@ -101,7 +102,7 @@ def set_default_route(host):
         routerip = IP_SETTING['sw0-eth2']
     elif(host.name == 'client'):
         routerip = IP_SETTING['sw0-eth3']
-    print host.name, routerip
+    print(host.name, routerip)
     host.cmd('route add %s/32 dev %s-eth0' % (routerip, host.name))
     host.cmd('route add default gw %s dev %s-eth0' % (routerip, host.name))
     ips = IP_SETTING[host.name].split(".") 
@@ -114,7 +115,7 @@ def get_ip_setting():
                 if( len(line.split()) == 0):
                   break
                 name, ip = line.split()
-                print name, ip
+                print(name, ip)
                 IP_SETTING[name] = ip
             info( '*** Successfully loaded ip settings for hosts\n %s\n' % IP_SETTING)
     except EnvironmentError:
@@ -126,7 +127,7 @@ def cs144net():
     get_ip_setting()
     topo = CS144Topo()
     info( '*** Creating network\n' )
-    net = Mininet( topo=topo, controller=RemoteController, ipBase=IPBASE )
+    net = Mininet( topo=topo, controller=partial( RemoteController, ip="127.0.0.1", port=6633 ), ipBase=IPBASE )
     net.start()
     server1, server2, client, router = net.get( 'server1', 'server2', 'client', 'sw0')
     s1intf = server1.defaultIntf()

@@ -16,8 +16,44 @@
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
 */
-void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    /* Fill this in */
+void sr_arpcache_sweepreqs(struct sr_instance *sr) {
+    struct sr_arpreq *req = sr->cache.requests;
+
+    while (req) {
+        /* sr_handle_arpreq may destroy req, so step past it first. */
+        struct sr_arpreq *next = req->next;
+        sr_handle_arpreq(sr, req);
+        req = next;
+    }
+}
+
+#define SR_ARPREQ_MAX_SENDS 5
+
+/* See the pseudocode in sr_arpcache.h. Caller must hold sr->cache.lock. */
+void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
+    time_t now = time(NULL);
+
+    /* time() only has 1s resolution and the sweeper wakes every ~1s, so the
+       pseudocode's "> 1.0" would resend only every other sweep. */
+    if (difftime(now, req->sent) < 1.0)
+        return;
+
+    if (req->times_sent >= SR_ARPREQ_MAX_SENDS) {
+        struct sr_packet *pkt;
+        for (pkt = req->packets; pkt; pkt = pkt->next) {
+            /* Like the reference sr_solution, report from the interface we
+               tried to ARP out of. */
+            struct sr_if *iface = sr_get_interface(sr, pkt->iface);
+            sr_send_icmp_error(sr, pkt->buf, pkt->len, icmp_type_dest_unreach,
+                               icmp_code_host_unreach, iface ? iface->ip : 0);
+        }
+        sr_arpreq_destroy(&sr->cache, req);
+    }
+    else {
+        sr_send_arp_request(sr, req);
+        req->sent = now;
+        req->times_sent++;
+    }
 }
 
 /* You should not need to touch the rest of this code. */

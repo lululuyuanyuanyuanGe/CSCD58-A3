@@ -1,0 +1,16 @@
+# Router build output
+router/*.o
+router/.*.d
+router/sr
+
+# Python / POX module install artifacts
+__pycache__/
+*.pyc
+*.pyo
+pox_module/*.egg-info/
+
+# Runtime leftovers
+pox
+nohup.out
+index.html*
+*.pcap
